@@ -58,27 +58,30 @@ def get_data():
 #############################
 def mastermind():
 
-	#get the input data
+	#Get the input data
 	data = get_data()
 	data.reverse()
 
-	#get the number of TCs
+	#Get the number of TCs
 	TC = int(data.pop())
 
-	#main loop
+	#Main loop
 	while (TC > 0):
 
-		#data about the next few lines
+		#Data about the next few lines
 		initial = data.pop()
-		n = int(initial[0:1]) #number of valid values
-		k = int(initial[2:3]) #number of positions
-		q = int(initial[4:5]) #number of guesses
+		initial = initial.split()
+		n = int(initial[0]) #Number of valid values
+		k = int(initial[1]) #Number of positions
+		q = int(initial[2]) #Number of guesses
 		player2 = []
 		for i in range(q):
 			player2.append(data.pop())
 
+		#Print the result
 		print search_for_key(n,k,q,player2)
 
+		#Move on to the next TC
 		TC -= 1
 
 ####################################################
@@ -86,86 +89,113 @@ def mastermind():
 ####################################################
 def search_for_key(n,k,q,player2):
 
+	#reminder:
+	#n = number of valid values
+	#k = number of positions
+	#q = number of guesses
+
+	#This will hold all the guesses
 	guesses = {}
-	possible = [[y+1 for y in range(n)] for x in range(k)]
-	fast_check = False
+	#This will hold all the valid possibilities
+	possible = [[y+1 for y in range(n)] for x in range(k)] 
 
-	#Store the player 2 results
+	#Store the player 2 results in guesses
+	#Will take on this format:
+	# number correct (key): guesses that resulted in that value (values)
 	for results in player2:
-		print 'results:', results
-	return
-#		z = int(results[-1])
-#		if z in guesses:
-#			guesses[z].append([int(results[x]) for x in range(len(results)-1) if results[x] != " "])
-#		else:
-#			guesses[z] = [[int(results[x]) for x in range(len(results)-1) if results[x] != " "]]
+		z = int(results[-1])
+		if z in guesses:
+			guesses[z].append([int(results[x]) for x in range(len(results)-1) if results[x] != " "])
+		else:
+			guesses[z] = [[int(results[x]) for x in range(len(results)-1) if results[x] != " "]]
 
-	#Start with the most limiting scenario (correct = k)
+	#There are two special scenarios:
+	#Correct = 0 (got nothing right)
+	#Correct = k (got everything right)
+	#In both scenarios, it's clear, without ambiguity, what the implication is
+	
+	#Start with correct = k
 	if k in guesses:
-		temp = guesses[k]
-		for i in range(k):
-			possible[i] = [temp[0][i]]
-		fast_check = True
+		i = True
+		for valids in guesses[k]:
+			if i:
+				for j in range(k):
+					possible[j] = [valids[j]]
+				fatal_check = valids
+				i = False
+			else:
+				#Contradiction - can't have more than one type of 'perfect' response
+				if fatal_check != valids:
+					return 'No'
 
-	#Second most-limiting scenario (correct = 0)
-	if 0 in guesses and not(fast_check):
-		eraser = []
-		for guess in guesses[0]:
-			print 'guess: ', guess
+	#Now process correct = 0
+	if 0 in guesses:
+		for invalids in guesses[0]:
+			for j in range(k):
+				new_val = []
+				for i in range(len(possible[j])):
+					if possible[j][i] != invalids[j]:
+						new_val.append(possible[j][i])
+				#Exhausted all possibilities - no possibilities left
+				if not(new_val):
+					return 'No'
+				possible[j] = new_val
 
+	#Number of possibilities
+	total = 1
+	for p in possible:
+		total *= len(p)
 
+	#generate possibility blocks
+	poss_dictionary = {}
+	for i in range(total):
+		poss_dictionary[i] = [0 for x in range(k)]
 
+	#populate possibility blocks
+	k = 0
+	prior = 1
+	for pos_i in possible:
+		j = 0
+		i = 0
+		block_size = total / len(pos_i) / prior
+		while i < total:
+			poss_dictionary[i][k] = pos_i[j]
+			i += 1
+			if i % block_size == 0:
+				j +=1
+				if j == len(pos_i):
+					j = 0
+		k += 1
+		prior *= len(pos_i)
 
+	#Now loop through each of the remaining guesses, and validate the score
+	#against the possible values array
+	for score in guesses:
+		if score > 0 and score < k:
+			for guess in guesses[score]:
+				del_p = []
+				for p_key in poss_dictionary:
+					if score != compute_score(poss_dictionary[p_key],guess):
+						#poss_dictionary.pop(p_key)
+						del_p.append(p_key)
+				for i in range(len(del_p)):
+					poss_dictionary.pop(del_p[i])
+				if len(poss_dictionary) == 0:
+					return 'No'
 
-
-#		temp = guesses[0]
-#		for guess in temp:
-#			for i in range(k):
-#				for guess[i] in possible[i]: 
-#					possible[i].remove(guess[i])
-#		fast_check = True
-#		for i in range(k):
-#			if len(possible[i]) != 0:
-#				fast_check = False
-#				break
-
-	#Check for fast-check execution
-	#if fast_check:
-	return validate_mm(possible,guesses)
-
-	#No fast-check execution - slower processing
-
-
-
-
-
-
-	#keys = guesses.keys()
-
-
-	#print 'keys: ', keys
-	#print 'guesses: ', guesses
-
-	#return 'undef'
-
-def validate_mm(possible,guesses):
-
-	print 'possible', possible
-	for guess in guesses:
-		print 'guesses: ', guesses[guess]
-
-	for guess in guesses:
-		temp = guesses[guess]
-		for act_guesses in temp:
-			check = 0
-			for x in range(len(act_guesses)):
-				if act_guesses[x] in possible[x]:
-					check += 1
-			if check != guess:
-				return 'No'
-
+	#Success!
 	return 'Yes'
+	#return poss_dictionary
 
+
+def compute_score(key,guess):
+
+	score = 0
+	for i in range(len(key)):
+		if key[i] == guess[i]:
+			score += 1
+
+	return score
 
 
 mastermind()
